@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand Piano</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #08080c;
+            background-image:
+                radial-gradient(ellipse at 50% 20%, rgba(60, 30, 10, 0.2) 0%, transparent 70%),
+                radial-gradient(ellipse at 80% 80%, rgba(20, 10, 5, 0.15) 0%, transparent 50%);
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* ── Loading Overlay ── */
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 8, 12, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.6s, visibility 0.6s;
+        }
+
+        #loadingOverlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .ld-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            color: #d4a853;
+            margin-bottom: 1.2rem;
+            letter-spacing: 1px;
+        }
+
+        .ld-track {
+            width: 240px;
+            height: 3px;
+            background: rgba(212, 168, 83, 0.12);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .ld-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #d4a853, #f0d48a);
+            transition: width 0.2s;
+        }
+
+        .ld-status {
+            margin-top: 0.8rem;
+            font-size: 0.7rem;
+            color: rgba(212, 168, 83, 0.45);
+            letter-spacing: 1px;
+        }
+
+        .ld-skip {
+            margin-top: 1.2rem;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 6px 18px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ld-skip:hover {
+            color: #d4a853;
+            border-color: rgba(212, 168, 83, 0.3);
+        }
+
+        /* ── Header ── */
+        .header {
+            text-align: center;
+            margin-bottom: 1.2rem;
+        }
+
+        .header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #d4a853;
+            letter-spacing: 1px;
+            text-shadow: 0 0 30px rgba(212, 168, 83, 0.15);
+        }
+
+        .header .sub {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.2);
+            margin-top: 0.3rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* ── Controls ── */
+        .controls {
+            display: flex;
+            gap: 1.2rem;
+            align-items: center;
+            margin-bottom: 1.2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .ctrl {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .ctrl label {
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 80px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.07);
+            border-radius: 2px;
+            outline: none;
+            border: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #d4a853, #b8862d);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(212, 168, 83, 0.3);
+        }
+
+        .sustain-badge {
+            font-size: 0.6rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            color: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.2s;
+        }
+
+        .sustain-badge.on {
+            color: #d4a853;
+            background: rgba(212, 168, 83, 0.08);
+            border-color: rgba(212, 168, 83, 0.25);
+            box-shadow: 0 0 12px rgba(212, 168, 83, 0.1);
+        }
+
+        #sampleStatus {
+            font-size: 0.55rem;
+            padding: 3px 10px;
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        #sampleStatus.synth {
+            color: rgba(255, 180, 80, 0.6);
+            background: rgba(255, 180, 80, 0.06);
+        }
+
+        #sampleStatus.loaded {
+            color: rgba(100, 220, 130, 0.6);
+            background: rgba(100, 220, 130, 0.06);
+        }
+
+        /* ── Piano Body ── */
+        .piano-body {
+            background: linear-gradient(180deg, #18150f 0%, #100e09 50%, #0c0a06 100%);
+            border-radius: 12px 12px 16px 16px;
+            padding: 16px 20px 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(212, 168, 83, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        /* ── Visualizer ── */
+        .vis-wrap {
+            height: 40px;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.4);
+            margin-bottom: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(212, 168, 83, 0.04);
+        }
+
+        .vis-wrap canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* ── Piano Keys ── */
+        .piano {
+            display: flex;
+            position: relative;
+        }
+
+        .key {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .key-white {
+            width: 48px;
+            height: 190px;
+            background: linear-gradient(180deg,
+                    #f5f5f0 0%, #fefefe 8%, #f8f8f4 50%, #f0f0ea 85%, #e6e5df 100%);
+            border-left: 1px solid rgba(0, 0, 0, 0.08);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 0 0 5px 5px;
+            z-index: 1;
+            box-shadow: -1px 0 0 rgba(255, 255, 255, 0.8) inset, 0 0 5px rgba(0, 0, 0, 0.08) inset,
+                0 2px 3px rgba(0, 0, 0, 0.15), 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .key-white::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 3px;
+            right: 3px;
+            height: 50%;
+            background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.015) 100%);
+            border-radius: 0 0 4px 4px;
+            pointer-events: none;
+        }
+
+        .key-white.active {
+            background: linear-gradient(180deg,
+                    #ede8d8 0%, #f5f0e0 8%, #efe9d8 50%, #e8e2d0 85%, #ddd7c5 100%);
+            box-shadow: -1px 0 0 rgba(255, 255, 255, 0.6) inset, 0 0 3px rgba(0, 0, 0, 0.05) inset,
+                0 1px 2px rgba(0, 0, 0, 0.1), 0 0 20px rgba(212, 168, 83, 0.1);
+            transform: translateY(2px);
+        }
+
+        .key-black {
+            width: 30px;
+            height: 120px;
+            background: linear-gradient(180deg,
+                    #2a2a28 0%, #1e1e1c 30%, #181816 70%, #141412 90%, #1a1a18 100%);
+            border: 1px solid #0a0a09;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            position: absolute;
+            z-index: 2;
+            box-shadow: -1px 0 0 rgba(80, 80, 70, 0.3) inset, 1px 0 0 rgba(80, 80, 70, 0.15) inset,
+                0 0 1px rgba(255, 255, 255, 0.03) inset, 0 4px 8px rgba(0, 0, 0, 0.6);
+        }
+
+        .key-black::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 2px;
+            right: 2px;
+            height: 60%;
+            background: linear-gradient(180deg, rgba(60, 58, 52, 0.6) 0%, transparent 100%);
+            border-radius: 0 0 3px 3px;
+            pointer-events: none;
+        }
+
+        .key-black.active {
+            background: linear-gradient(180deg,
+                    #2d2820 0%, #241f18 30%, #1d1812 70%, #181410 90%, #1e1a14 100%);
+            box-shadow: -1px 0 0 rgba(80, 70, 50, 0.3) inset, 1px 0 0 rgba(80, 70, 50, 0.15) inset,
+                0 2px 4px rgba(0, 0, 0, 0.5), 0 0 15px rgba(212, 168, 83, 0.08);
+            transform: translateY(2px);
+        }
+
+        .key-label {
+            pointer-events: none;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .key-white .key-label {
+            margin-bottom: 7px;
+        }
+
+        .key-white .key-label .hotkey {
+            font-size: 0.55rem;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.22);
+            display: block;
+        }
+
+        .key-white .key-label .note-name {
+            font-size: 0.45rem;
+            color: rgba(0, 0, 0, 0.13);
+            display: block;
+            margin-top: 2px;
+        }
+
+        .key-black .key-label {
+            margin-bottom: 5px;
+        }
+
+        .key-black .key-label .hotkey {
+            font-size: 0.5rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.2);
+            display: block;
+        }
+
+        .key-black .key-label .note-name {
+            font-size: 0.4rem;
+            color: rgba(255, 255, 255, 0.1);
+            display: block;
+            margin-top: 2px;
+        }
+
+        .footer {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.12);
+            letter-spacing: 0.5px;
+            line-height: 1.7;
+        }
+
+        .footer span {
+            color: rgba(212, 168, 83, 0.25);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Loading overlay (non-blocking: has skip button + auto-timeout) -->
+    <div id="loadingOverlay">
+        <div class="ld-title">Loading Piano Samples</div>
+        <div class="ld-track">
+            <div class="ld-fill" id="ldFill"></div>
+        </div>
+        <div class="ld-status" id="ldStatus">Preparing…</div>
+        <div class="ld-skip" id="ldSkip" onclick="dismissLoading()">Skip — use synthesized sounds</div>
+    </div>
+
+    <div class="header">
+        <h1>🎹 Grand Piano</h1>
+        <div class="sub">Real Sampled Grand Piano</div>
+    </div>
+
+    <div class="controls">
+        <div class="ctrl"><label>Volume</label>
+            <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7">
+        </div>
+        <div class="ctrl"><label>Reverb</label>
+            <input type="range" id="reverb" min="0" max="1" step="0.01" value="0.25">
+        </div>
+        <div class="sustain-badge" id="sustainBadge">SUSTAIN — SPACE</div>
+        <span id="sampleStatus" class="synth">● SYNTH</span>
+    </div>
+
+    <div class="piano-body">
+        <div class="vis-wrap"><canvas id="visCanvas"></canvas></div>
+        <div class="piano" id="piano"></div>
+    </div>
+
+    <div class="footer">
+        White keys <span>A S D F G H J K L ; '</span> · Black keys <span>W E T Y U O P</span> · <span>Space</span>
+        sustain
+    </div>
+
+    <script>
+        (() => {
+            // ================================================================
+            //  AUDIO CONTEXT  (created on first user gesture to avoid autoplay block)
+            // ================================================================
+            let audioCtx, masterGain, convolver, reverbGain, dryGain, analyser;
+            let audioReady = false;
+
+            function ensureAudio() {
+                if (audioReady) {
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    return;
+                }
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.7;
+
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 512;
+
+                // Reverb via convolver
+                convolver = audioCtx.createConvolver();
+                reverbGain = audioCtx.createGain();
+                reverbGain.gain.value = 0.25;
+                dryGain = audioCtx.createGain();
+                dryGain.gain.value = 1;
+
+                masterGain.connect(dryGain);
+                masterGain.connect(convolver);
+                convolver.connect(reverbGain);
+                dryGain.connect(analyser);
+                reverbGain.connect(analyser);
+                analyser.connect(audioCtx.destination);
+
+                // Generate reverb impulse
+                const rate = audioCtx.sampleRate;
+                const len = rate * 2.5;
+                const ir = audioCtx.createBuffer(2, len, rate);
+                for (let ch = 0; ch < 2; ch++) {
+                    const d = ir.getChannelData(ch);
+                    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+                }
+                convolver.buffer = ir;
+
+                audioReady = true;
+                startVisualizer();
+            }
+
+            // ================================================================
+            //  NOTE HELPERS
+            // ================================================================
+            function noteToMidi(n) {
+                const m = n.match(/^([A-G])(b|#|s)?(\d)$/);
+                if (!m) return 0;
+                const base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]];
+                const acc = m[2] === '#' || m[2] === 's' ? 1 : m[2] === 'b' ? -1 : 0;
+                return (parseInt(m[3]) + 1) * 12 + base + acc;
+            }
+            function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+            // ================================================================
+            //  SYNTH ENGINE  (always-available fallback + instant play)
+            // ================================================================
+            function synthPlay(midi, vol) {
+                const freq = midiToFreq(midi);
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const osc3 = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+
+                // Piano-like composite waveform
+                osc1.type = 'triangle';
+                osc1.frequency.value = freq;
+                osc2.type = 'sine';
+                osc2.frequency.value = freq * 2; // 2nd harmonic
+                osc3.type = 'sine';
+                osc3.frequency.value = freq * 3; // 3rd harmonic
+
+                const g2 = audioCtx.createGain();
+                g2.gain.value = 0.2;
+                const g3 = audioCtx.createGain();
+                g3.gain.value = 0.08;
+
+                osc1.connect(g);
+                osc2.connect(g2); g2.connect(g);
+                osc3.connect(g3); g3.connect(g);
+                g.connect(masterGain);
+
+                // Piano-like ADSR
+                const t = audioCtx.currentTime;
+                g.gain.setValueAtTime(0, t);
+                g.gain.linearRampToValueAtTime(vol * 0.7, t + 0.005);
+                g.gain.exponentialRampToValueAtTime(vol * 0.4, t + 0.08);
+                g.gain.exponentialRampToValueAtTime(vol * 0.15, t + 0.8);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 3);
+
+                osc1.start(t); osc2.start(t); osc3.start(t);
+                osc1.stop(t + 4); osc2.stop(t + 4); osc3.stop(t + 4);
+
+                return { oscs: [osc1, osc2, osc3], gain: g, type: 'synth' };
+            }
+
+            // ================================================================
+            //  SAMPLE ENGINE
+            // ================================================================
+            const SAMPLE_CDN = 'https://tonejs.github.io/audio/salamander/';
+            const SAMPLE_NOTES = {
+                'A0': 'A0v1', 'C1': 'C1v1', 'Ds1': 'Ds1v1', 'Fs1': 'Fs1v1',
+                'A1': 'A1v1', 'C2': 'C2v1', 'Ds2': 'Ds2v1', 'Fs2': 'Fs2v1',
+                'A2': 'A2v1', 'C3': 'C3v1', 'Ds3': 'Ds3v1', 'Fs3': 'Fs3v1',
+                'A3': 'A3v1', 'C4': 'C4v1', 'Ds4': 'Ds4v1', 'Fs4': 'Fs4v1',
+                'A4': 'A4v1', 'C5': 'C5v1', 'Ds5': 'Ds5v1', 'Fs5': 'Fs5v1',
+                'A5': 'A5v1', 'C6': 'C6v1', 'Ds6': 'Ds6v1', 'Fs6': 'Fs6v1',
+                'A6': 'A6v1', 'C7': 'C7v1', 'Ds7': 'Ds7v1', 'Fs7': 'Fs7v1',
+                'A7': 'A7v1', 'C8': 'C8v1'
+            };
+
+            const sampleBuffers = {};
+            const sampleMidis = [];
+            let samplesLoaded = false;
+
+            function samplePlay(midi, vol) {
+                if (!samplesLoaded || sampleMidis.length === 0) return null;
+
+                // Find nearest sample
+                let best = sampleMidis[0], bestD = Math.abs(midi - best);
+                for (const s of sampleMidis) {
+                    const d = Math.abs(midi - s);
+                    if (d < bestD) { bestD = d; best = s; }
+                }
+                const buf = sampleBuffers[best];
+                if (!buf) return null;
+
+                const src = audioCtx.createBufferSource();
+                src.buffer = buf;
+                src.playbackRate.value = Math.pow(2, (midi - best) / 12);
+
+                const g = audioCtx.createGain();
+                g.gain.value = vol;
+                src.connect(g);
+                g.connect(masterGain);
+                src.start();
+
+                return { source: src, gain: g, type: 'sample' };
+            }
+
+            // Load samples in background (non-blocking — piano works immediately via synth)
+            async function loadSamplesInBackground() {
+                const entries = Object.entries(SAMPLE_NOTES);
+                let loaded = 0;
+                const fillEl = document.getElementById('ldFill');
+                const statusEl = document.getElementById('ldStatus');
+
+                for (const [noteName, fileName] of entries) {
+                    try {
+                        const resp = await fetch(SAMPLE_CDN + fileName + '.mp3');
+                        if (!resp.ok) throw new Error(resp.status);
+                        const ab = await resp.arrayBuffer();
+                        // Need an AudioContext to decode — create a temp one if needed
+                        if (!audioCtx) {
+                            const tmp = new (window.AudioContext || window.webkitAudioContext)();
+                            const decoded = await tmp.decodeAudioData(ab);
+                            const midi = noteToMidi(noteName);
+                            sampleBuffers[midi] = decoded;
+                            tmp.close();
+                        } else {
+                            const decoded = await audioCtx.decodeAudioData(ab);
+                            const midi = noteToMidi(noteName);
+                            sampleBuffers[midi] = decoded;
+                        }
+                    } catch (e) {
+                        console.warn('Sample load failed:', noteName, e);
+                    }
+                    loaded++;
+                    const pct = Math.round((loaded / entries.length) * 100);
+                    if (fillEl) fillEl.style.width = pct + '%';
+                    if (statusEl) statusEl.textContent = `${noteName} (${loaded}/${entries.length})`;
+                }
+
+                sampleMidis.push(...Object.keys(sampleBuffers).map(Number).sort((a, b) => a - b));
+
+                if (sampleMidis.length > 0) {
+                    samplesLoaded = true;
+                    const badge = document.getElementById('sampleStatus');
+                    badge.textContent = '● SAMPLES';
+                    badge.className = 'loaded';
+                }
+
+                dismissLoading();
+            }
+
+            // ================================================================
+            //  NOTE MAP (visible: C3 → C6, hotkeys on C4 → E5 range)
+            // ================================================================
+            const ALL_NOTES = [];
+            // Build C3 to C6
+            for (let midi = noteToMidi('C3'); midi <= noteToMidi('C6'); midi++) {
+                const isBlack = [1, 3, 6, 8, 10].includes(midi % 12);
+                const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                const oct = Math.floor(midi / 12) - 1;
+                const name = names[midi % 12] + oct;
+                ALL_NOTES.push({ midi, name, isBlack, freq: midiToFreq(midi) });
+            }
+
+            // Hotkey mapping (C4–E5 range)
+            const WHITE_HOTKEYS = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"];
+            const BLACK_HOTKEYS = ['w', 'e', null, 't', 'y', 'u', null, 'o', 'p', null];
+            const keyToMidi = {};
+            let whi = 0, bli = 0;
+            for (let midi = noteToMidi('C4'); midi <= noteToMidi('E5'); midi++) {
+                const isBlack = [1, 3, 6, 8, 10].includes(midi % 12);
+                if (isBlack) {
+                    if (bli < BLACK_HOTKEYS.length && BLACK_HOTKEYS[bli]) {
+                        keyToMidi[BLACK_HOTKEYS[bli]] = midi;
+                        const n = ALL_NOTES.find(x => x.midi === midi);
+                        if (n) n.hotkey = BLACK_HOTKEYS[bli].toUpperCase();
+                    }
+                    bli++;
+                } else {
+                    if (whi < WHITE_HOTKEYS.length) {
+                        keyToMidi[WHITE_HOTKEYS[whi]] = midi;
+                        const n = ALL_NOTES.find(x => x.midi === midi);
+                        if (n) n.hotkey = WHITE_HOTKEYS[whi].toUpperCase();
+                    }
+                    whi++;
+                }
+            }
+
+            // ================================================================
+            //  BUILD PIANO DOM
+            // ================================================================
+            const pianoEl = document.getElementById('piano');
+            const KEY_W = 48;
+            let whiteCount = 0;
+
+            ALL_NOTES.forEach(n => {
+                const el = document.createElement('div');
+                el.classList.add('key', n.isBlack ? 'key-black' : 'key-white');
+                el.dataset.midi = n.midi;
+
+                if (n.isBlack) {
+                    const whitesBefore = ALL_NOTES.filter(x => !x.isBlack && x.midi < n.midi).length;
+                    el.style.left = (whitesBefore * KEY_W - 15) + 'px';
+                } else {
+                    whiteCount++;
+                }
+
+                const label = document.createElement('div');
+                label.classList.add('key-label');
+                if (n.hotkey) {
+                    const hk = document.createElement('span');
+                    hk.classList.add('hotkey');
+                    hk.textContent = n.hotkey;
+                    label.appendChild(hk);
+                }
+                const nn = document.createElement('span');
+                nn.classList.add('note-name');
+                nn.textContent = n.name;
+                label.appendChild(nn);
+                el.appendChild(label);
+
+                // ── Mouse interaction ──
+                el.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    ensureAudio();
+                    noteOn(n.midi);
+                    mouseHeld = true;
+                    mouseNote = n.midi;
+                });
+                el.addEventListener('mouseenter', e => {
+                    if (mouseHeld) {
+                        ensureAudio();
+                        noteOn(n.midi);
+                        mouseNote = n.midi;
+                    }
+                });
+                el.addEventListener('mouseleave', () => {
+                    if (mouseHeld && mouseNote === n.midi) {
+                        noteOff(n.midi);
+                    }
+                });
+                el.addEventListener('mouseup', () => {
+                    noteOff(n.midi);
+                    mouseHeld = false;
+                });
+
+                // ── Touch support ──
+                el.addEventListener('touchstart', e => {
+                    e.preventDefault();
+                    ensureAudio();
+                    noteOn(n.midi);
+                }, { passive: false });
+                el.addEventListener('touchend', e => {
+                    e.preventDefault();
+                    noteOff(n.midi);
+                }, { passive: false });
+
+                pianoEl.appendChild(el);
+            });
+
+            pianoEl.style.width = (whiteCount * KEY_W) + 'px';
+
+            let mouseHeld = false;
+            let mouseNote = null;
+            document.addEventListener('mouseup', () => { mouseHeld = false; });
+
+            // ================================================================
+            //  NOTE ON / OFF
+            // ================================================================
+            const activeNotes = {};
+            const sustainedNotes = {};
+            let sustain = false;
+
+            function noteOn(midi) {
+                ensureAudio();
+                // Kill existing
+                if (activeNotes[midi]) { killNote(midi, activeNotes[midi]); delete activeNotes[midi]; }
+                if (sustainedNotes[midi]) { killNote(midi, sustainedNotes[midi]); delete sustainedNotes[midi]; }
+
+                const vol = parseFloat(document.getElementById('volume').value);
+
+                // Try sample first, fall back to synth
+                let data = samplePlay(midi, vol);
+                if (!data) data = synthPlay(midi, vol);
+
+                activeNotes[midi] = data;
+                setActive(midi, true);
+            }
+
+            function noteOff(midi) {
+                const data = activeNotes[midi];
+                if (!data) return;
+
+                if (sustain) {
+                    sustainedNotes[midi] = data;
+                    delete activeNotes[midi];
+                    return;
+                }
+
+                releaseNote(midi, data);
+                delete activeNotes[midi];
+            }
+
+            function releaseNote(midi, data) {
+                if (!data) return;
+                const t = audioCtx.currentTime;
+                data.gain.gain.cancelScheduledValues(t);
+                data.gain.gain.setValueAtTime(data.gain.gain.value, t);
+                data.gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+                setTimeout(() => {
+                    try {
+                        if (data.type === 'sample' && data.source) data.source.stop();
+                        if (data.type === 'synth' && data.oscs) data.oscs.forEach(o => { try { o.stop(); } catch (e) { } });
+                    } catch (e) { }
+                }, 900);
+                setActive(midi, false);
+            }
+
+            function killNote(midi, data) {
+                if (!data) return;
+                const t = audioCtx.currentTime;
+                data.gain.gain.cancelScheduledValues(t);
+                data.gain.gain.setValueAtTime(data.gain.gain.value, t);
+                data.gain.gain.linearRampToValueAtTime(0, t + 0.015);
+                setTimeout(() => {
+                    try {
+                        if (data.type === 'sample' && data.source) data.source.stop();
+                        if (data.type === 'synth' && data.oscs) data.oscs.forEach(o => { try { o.stop(); } catch (e) { } });
+                    } catch (e) { }
+                }, 25);
+                setActive(midi, false);
+            }
+
+            function releaseSustained() {
+                for (const midi in sustainedNotes) {
+                    releaseNote(parseInt(midi), sustainedNotes[midi]);
+                    delete sustainedNotes[midi];
+                }
+            }
+
+            function setActive(midi, on) {
+                const el = pianoEl.querySelector(`[data-midi="${midi}"]`);
+                if (el) el.classList.toggle('active', on);
+            }
+
+            // ================================================================
+            //  KEYBOARD
+            // ================================================================
+            const pressed = {};
+            document.addEventListener('keydown', e => {
+                if (e.repeat) return;
+                const k = e.key.toLowerCase();
+                if (k === ' ') {
+                    e.preventDefault();
+                    sustain = true;
+                    document.getElementById('sustainBadge').classList.add('on');
+                    document.getElementById('sustainBadge').textContent = 'SUSTAIN — ON';
+                    return;
+                }
+                if (keyToMidi[k] !== undefined && !pressed[k]) {
+                    e.preventDefault();
+                    ensureAudio();
+                    pressed[k] = true;
+                    noteOn(keyToMidi[k]);
+                }
+            });
+            document.addEventListener('keyup', e => {
+                const k = e.key.toLowerCase();
+                if (k === ' ') {
+                    sustain = false;
+                    document.getElementById('sustainBadge').classList.remove('on');
+                    document.getElementById('sustainBadge').textContent = 'SUSTAIN — SPACE';
+                    releaseSustained();
+                    return;
+                }
+                if (keyToMidi[k] !== undefined) {
+                    pressed[k] = false;
+                    noteOff(keyToMidi[k]);
+                }
+            });
+            window.addEventListener('keydown', e => { if (e.key === ' ') e.preventDefault(); });
+
+            // ================================================================
+            //  CONTROLS
+            // ================================================================
+            document.getElementById('volume').addEventListener('input', e => {
+                if (masterGain) masterGain.gain.value = parseFloat(e.target.value);
+            });
+            document.getElementById('reverb').addEventListener('input', e => {
+                const v = parseFloat(e.target.value);
+                if (reverbGain) reverbGain.gain.value = v;
+                if (dryGain) dryGain.gain.value = 1 - v * 0.3;
+            });
+
+            // ================================================================
+            //  VISUALIZER
+            // ================================================================
+            const canvas = document.getElementById('visCanvas');
+            const ctx2d = canvas.getContext('2d');
+
+            function startVisualizer() {
+                const bufLen = analyser.frequencyBinCount;
+                const data = new Uint8Array(bufLen);
+
+                function resize() {
+                    const dpr = window.devicePixelRatio || 1;
+                    canvas.width = canvas.offsetWidth * dpr;
+                    canvas.height = canvas.offsetHeight * dpr;
+                    ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+                }
+                resize();
+                window.addEventListener('resize', resize);
+
+                (function draw() {
+                    requestAnimationFrame(draw);
+                    if (!analyser) return;
+                    analyser.getByteTimeDomainData(data);
+                    const w = canvas.offsetWidth, h = canvas.offsetHeight;
+                    ctx2d.clearRect(0, 0, w, h);
+
+                    // Waveform
+                    ctx2d.lineWidth = 1.5;
+                    ctx2d.strokeStyle = 'rgba(212,168,83,0.3)';
+                    ctx2d.beginPath();
+                    const sw = w / bufLen;
+                    for (let i = 0; i < bufLen; i++) {
+                        const y = (data[i] / 128.0) * h / 2;
+                        i === 0 ? ctx2d.moveTo(0, y) : ctx2d.lineTo(i * sw, y);
+                    }
+                    ctx2d.stroke();
+                })();
+            }
+
+            // ================================================================
+            //  LOADING
+            // ================================================================
+            window.dismissLoading = function () {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            };
+
+            // Auto-dismiss loading after 8 seconds even if samples aren't done
+            setTimeout(dismissLoading, 8000);
+
+            // Start loading samples in background
+            loadSamplesInBackground();
+        })();
+    </script>
+</body>
+
+</html>
